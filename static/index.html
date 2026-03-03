@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Extractor</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="sidebar">
+        <h1>Instagram Extractor</h1>
+        <p>Insira links de perfis. O sistema extrai a bio, aplica IA para limpeza de emojis e RQE/CRM e gera os atributos formatados para prospecção médica.</p>
+        
+        <div class="sidebar-menu">
+            <div class="menu-item active" id="tab-individual" onclick="switchTab('individual')">Individual</div>
+            <div class="menu-item" id="tab-batch" onclick="switchTab('batch')">Em Lote</div>
+            <div class="menu-item" id="tab-cover" onclick="switchTab('cover')">Capa</div>
+        </div>
+    </div>
+    
+    <div class="main-content">
+        <div class="container" id="panel-individual">
+            <div class="card">
+                <h2>URLs dos Perfis</h2>
+                <textarea id="urls-input" placeholder="https://instagram.com/dracinthiameiradermato/&#10;https://instagram.com/outro.perfil/"></textarea>
+                <div class="actions">
+                    <button id="extract-btn" onclick="extractProfiles()">Extrair Perfis</button>
+                    <div id="spinner" class="spinner"></div>
+                </div>
+            </div>
+            
+            <div class="card" id="output-section">
+                <h2>
+                    Resultados
+                    <div class="pagination" id="pagination">
+                        <button class="nav-btn" id="prev-btn" onclick="nav(-1)" disabled>&lt;</button>
+                        <span id="page-counter">1 / 1</span>
+                        <button class="nav-btn" id="next-btn" onclick="nav(1)">&gt;</button>
+                    </div>
+                </h2>
+                
+                <div class="field-group">
+                    <span class="field-label">Nome:</span>
+                    <div id="box-name" class="output-box empty" onclick="copyText('box-name')"></div>
+                </div>
+                
+                <div class="field-group">
+                    <span class="field-label">Especialidade:</span>
+                    <div id="box-specialty" class="output-box empty" onclick="copyText('box-specialty')"></div>
+                </div>
+                
+                <div class="field-group">
+                    <span class="field-label">Headline:</span>
+                    <div id="box-headline" class="output-box empty" onclick="copyText('box-headline')"></div>
+                </div>
+                
+                <div class="field-group link-container" id="link-container">
+                    <span class="field-label">Link Externo:</span>
+                    <a id="external-anchor" href="#" target="_blank" class="external-link">🔗 Visitar Link</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="container hidden" id="panel-batch">
+            <div class="card">
+                <h2>Processamento Em Lote (Excel)</h2>
+                <textarea id="batch-urls-input" placeholder="https://instagram.com/dracinthiameiradermato/&#10;https://instagram.com/outro.perfil/"></textarea>
+                <div class="actions">
+                    <button id="batch-extract-btn" onclick="extractBatch()">Processar e Baixar Excel</button>
+                    <div id="batch-spinner" class="spinner"></div>
+                    <span id="batch-progress" class="progress-text"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="container hidden" id="panel-cover">
+            <div class="card">
+                <h2>Gerador de Capas</h2>
+                <div class="field-group">
+                    <label class="field-label" for="cover-url-input">Link do Instagram</label>
+                    <input type="text" id="cover-url-input" class="form-input" placeholder="https://www.instagram.com/...">
+                </div>
+                
+                <div class="field-group">
+                    <label class="field-label">Foto da Médica</label>
+                    <div id="cover-photo-dropzone" class="photo-dropzone" onclick="document.getElementById('cover-photo-hidden').click()">
+                        <span id="cover-photo-text">Clique para escolher, arraste ou cole uma imagem (Cmd+V)</span>
+                        <img id="cover-photo-preview" class="photo-preview hidden" src="" alt="Preview">
+                        <button id="cover-photo-remove" class="remove-photo hidden" onclick="removePhoto(event)">✕</button>
+                    </div>
+                    <input type="file" id="cover-photo-hidden" accept="image/*" class="hidden" onchange="handlePhotoSelect(event)">
+                </div>
+                
+                <div class="field-group">
+                    <label class="field-label" for="cover-color-input">Cor Principal</label>
+                    <div class="color-picker-wrapper form-input">
+                        <input type="color" id="cover-color-swatch" class="color-swatch" value="#8A2B0F" oninput="syncColor('swatch')">
+                        <input type="text" id="cover-color-input" class="color-text" value="#8A2B0F" oninput="syncColor('text')">
+                    </div>
+                </div>
+                
+                <div class="actions" style="margin-top: 24px;">
+                    <button id="cover-generate-btn" onclick="generateCover()">Gerar Capa</button>
+                    <div id="cover-spinner" class="spinner"></div>
+                </div>
+                
+                <div id="cover-status" class="status-message" style="margin-top: 16px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
