@@ -153,7 +153,7 @@ def book_slot(date_str: str, time_str: str, lead_name: str, lead_number: str) ->
     service = get_calendar_service()
     if not service:
         logger.warning("Calendar service unavailable, skipping actual booking.")
-        return "mock_event_id"
+        return None
         
     # Since GPT sends us raw conversational dates (e.g. "Quinta, 14/03" and "14:00")
     # In a full-blown implementation we'd use a robust date parser.

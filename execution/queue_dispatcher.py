@@ -60,7 +60,7 @@ def process_warmup_queue():
             break
             
         logger.info("Sending warm-up to lead %d (batch item %d/%d)", lead["id"], idx+1, len(batch))
-        send_warm_up(lead["id"])
+        send_warm_up(lead["whatsapp_number"], lead["id"])
         
         # Delay before next message, unless it's the last one
         if idx < len(batch) - 1:

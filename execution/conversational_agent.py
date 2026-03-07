@@ -58,6 +58,7 @@ Seu objetivo é agendar uma breve reunião de 20 minutos (via Google Meet) para 
 - Suas mensagens devem ser CURTAS. Uma ideia por mensagem. Nunca mande blocos gigantes de texto.
 - Use um tom de voz adequado ao nível de formalidade médica, mas com a agilidade do WhatsApp.
 - NÃO use emojis em excesso.
+- NUNCA confirme uma reunião como agendada sem que o sistema tenha retornado um event_id válido do Google Calendar. Você pode propor horários e confirmar interesse, mas o status meeting_scheduled só será aplicado após booking real.
 """
 
 OBJECTION_PLAYBOOK = """
@@ -244,26 +245,36 @@ Responda APENAS em JSON estrito. Nenhuma marcação Markdown fora do JSON.
         success = send_followup(lead_id, reply_msg)
         
         # 2. Handle specific actions
+        event_id = None
         if action == "book_calendar":
-            # Assuming the AI successfully confirmed a slot in the text.
-            # In a full v1, we'd parse the chosen date/time out or have a separate tool call.
-            # For now, we mock the booking function behavior from check_calendar.
-            book_slot("TBD", "TBD", lead.get("formatted_name", ""), lead.get("whatsapp_number", ""))
-            
+            event_id = book_slot("TBD", "TBD", lead.get("formatted_name", ""), lead.get("whatsapp_number", ""))
+            if not event_id:
+                logger.warning("book_slot failed for lead %d — will NOT set meeting_scheduled", lead_id)
+                event_id = None
+
         # 3. Update Status and notify team if terminal
-        if status_update in ("meeting_scheduled", "lost", "opt_out"):
+        lead_name = lead.get("formatted_name", "Desconhecido")
+        lead_phone = lead.get("whatsapp_number", "")
+
+        if status_update == "meeting_scheduled":
+            if event_id:
+                update_status(lead_id, "meeting_scheduled")
+                notification_msg = f"[MEETING_SCHEDULED] Lead: {lead_name} | Number: {lead_phone} | Detail: Reunião agendada (event_id: {event_id})"
+                send_notification(TEAM_NOTIFICATION_NUMBER, notification_msg)
+            else:
+                logger.error("Agent requested meeting_scheduled for lead %d but no valid event_id — status NOT changed", lead_id)
+                send_followup(lead_id, "Tivemos um problema técnico ao confirmar o agendamento. Vou verificar e retorno em instantes!")
+                notification_msg = f"[BOOKING_FAILED] Lead: {lead_name} | Number: {lead_phone} | Detail: Agente pediu meeting_scheduled mas book_slot falhou. Verificar manualmente."
+                send_notification(TEAM_NOTIFICATION_NUMBER, notification_msg)
+
+        elif status_update in ("lost", "opt_out"):
             update_status(lead_id, status_update)
-            lead_name = lead.get("formatted_name", "Desconhecido")
-            lead_phone = lead.get("whatsapp_number", "")
-            
-            notification_detail = ""
-            if status_update == "meeting_scheduled":
-                notification_detail = "Reunião Agendada! O lead confirmou horário."
-            elif status_update == "lost":
+
+            if status_update == "lost":
                 notification_detail = f"Lead perdido. Motivo aparente no histórico."
-            elif status_update == "opt_out":
+            else:
                 notification_detail = "Solicitou remoção/Opt-out."
-                
+
             notification_msg = f"[STATUS: {status_update.upper()}] Lead: {lead_name} | Number: {lead_phone} | Detail: {notification_detail}"
             send_notification(TEAM_NOTIFICATION_NUMBER, notification_msg)
             

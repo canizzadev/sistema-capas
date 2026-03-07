@@ -76,6 +76,12 @@ ZAPI_BASE_URL = "https://api.z-api.io/instances/{instance}/token/{token}"
 # Log directory
 WHATSAPP_LOG_DIR = os.path.join(".tmp", "whatsapp_logs")
 
+# Expose configuration as a dict so other modules (e.g. queue_dispatcher)
+# can check send-window status without importing private helpers.
+config = {
+    "is_window_open": lambda: _is_within_send_window(),
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers
