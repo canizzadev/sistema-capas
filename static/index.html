@@ -15,8 +15,8 @@
             <div class="menu-item active" id="tab-individual" onclick="switchTab('individual')">Individual</div>
             <div class="menu-item" id="tab-batch" onclick="switchTab('batch')">Em Lote</div>
             <div class="menu-item" id="tab-cover" onclick="switchTab('cover')">Capa</div>
+            <div class="menu-item" id="tab-dashboard" onclick="switchTab('dashboard')">Dashboard</div>
         </div>
-    </div>
     
     <div class="main-content">
         <div class="container" id="panel-individual">
@@ -80,6 +80,16 @@
                     <label class="field-label" for="cover-url-input">Link do Instagram</label>
                     <input type="text" id="cover-url-input" class="form-input" placeholder="https://www.instagram.com/...">
                 </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="cover-whatsapp-input">WhatsApp do Médico(a) <span style="color:#888;font-weight:normal">(obrigatório)</span></label>
+                    <input type="text" id="cover-whatsapp-input" class="form-input" placeholder="5511999990001">
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="cover-name-override">Nome do Médico(a) <span style="color:#888;font-weight:normal">(opcional — só se o perfil for clínica)</span></label>
+                    <input type="text" id="cover-name-override" class="form-input" placeholder="Dra. Maria Silva">
+                </div>
                 
                 <div class="field-group">
                     <label class="field-label">Foto da Médica</label>
@@ -105,6 +115,43 @@
                 </div>
                 
                 <div id="cover-status" class="status-message" style="margin-top: 16px;"></div>
+                <div id="prospect-status" class="status-message" style="margin-top: 8px;"></div>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div class="container hidden" id="panel-dashboard">
+            <div class="card" style="max-width: 1000px; margin: 0 auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <h2 style="margin-bottom: 0;">Dashboard de Prospecção</h2>
+                    <button class="btn btn-secondary" onclick="loadLeads()" style="padding: 8px 16px; font-size: 14px; background: white; border: 1px solid #CBD5E1; border-radius: 6px; cursor: pointer;">Atualizar</button>
+                </div>
+                
+                <div id="leads-container" style="display: grid; gap: 16px;">
+                    <!-- Leads loaded via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conversation Modal -->
+    <div id="conversation-modal" class="modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: white; border-radius: 12px; width: 90%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
+            <div style="padding: 16px 24px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="modal-lead-name" style="margin: 0; font-size: 18px; font-weight: 600;">Histórico do Lead</h3>
+                <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #64748B;">&times;</button>
+            </div>
+            
+            <div id="modal-chat-history" style="padding: 24px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #F8FAFC; max-height: 50vh;">
+                <!-- Chat bubbles loaded via JS -->
+            </div>
+            
+            <div style="padding: 16px 24px; border-top: 1px solid #E2E8F0; background: white;">
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="manual-message-input" class="form-input" placeholder="Digite uma mensagem manual..." style="flex-grow: 1; margin: 0;">
+                    <button class="btn btn-primary" onclick="sendManualMessage()" id="btn-send-manual" style="padding: 12px 24px; margin: 0;">Enviar</button>
+                </div>
+                <div id="manual-send-status" class="status-message" style="margin-top: 8px;"></div>
             </div>
         </div>
     </div>

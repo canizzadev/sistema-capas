@@ -237,13 +237,21 @@ function switchTab(tab) {
     document.getElementById('tab-individual').classList.remove('active');
     document.getElementById('tab-batch').classList.remove('active');
     document.getElementById('tab-cover').classList.remove('active');
+    const td = document.getElementById('tab-dashboard');
+    if (td) td.classList.remove('active');
 
     document.getElementById('panel-individual').classList.add('hidden');
     document.getElementById('panel-batch').classList.add('hidden');
     document.getElementById('panel-cover').classList.add('hidden');
+    const pd = document.getElementById('panel-dashboard');
+    if (pd) pd.classList.add('hidden');
 
     document.getElementById(`tab-${tab}`).classList.add('active');
     document.getElementById(`panel-${tab}`).classList.remove('hidden');
+
+    if (tab === 'dashboard') {
+        loadLeads();
+    }
 }
 
 async function extractBatch() {
@@ -325,9 +333,17 @@ function syncColor(source) {
 async function generateCover() {
     const urlInput = document.getElementById('cover-url-input').value.trim();
     const colorInput = document.getElementById('cover-color-input').value;
+    const whatsappInput = document.getElementById('cover-whatsapp-input').value.trim();
+    const nameOverride = document.getElementById('cover-name-override').value.trim();
+    const prospectStatus = document.getElementById('prospect-status');
 
     if (!urlInput || !selectedPhotoFile) {
         alert('Por favor, informe o link do Instagram e insira uma foto da médica.');
+        return;
+    }
+
+    if (!whatsappInput) {
+        alert('Por favor, informe o número de WhatsApp do médico(a).');
         return;
     }
 
@@ -340,6 +356,7 @@ async function generateCover() {
     spinner.style.display = 'block';
     statusMsg.className = 'status-message';
     statusMsg.innerText = 'Buscando dados do Instagram e expandindo foto com IA... isso pode levar até 30 segundos.';
+    if (prospectStatus) prospectStatus.innerText = '';
 
     const formData = new FormData();
     formData.append('instagram_url', urlInput);
@@ -370,6 +387,44 @@ async function generateCover() {
         a.click();
         window.URL.revokeObjectURL(downloadUrl);
         a.remove();
+
+        // --- Chain into POST /prospect to register lead ---
+        if (prospectStatus) {
+            prospectStatus.className = 'status-message';
+            prospectStatus.innerText = 'Registrando lead para prospecção...';
+        }
+
+        try {
+            const prospectResp = await fetch('/prospect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    instagram_url: urlInput,
+                    whatsapp_number: whatsappInput,
+                    formatted_name: nameOverride,
+                    username: urlInput.split('/').filter(Boolean).pop() || '',
+                })
+            });
+
+            if (prospectResp.ok) {
+                const data = await prospectResp.json();
+                if (prospectStatus) {
+                    prospectStatus.className = 'status-message success';
+                    prospectStatus.innerText = `Lead registrado com sucesso! (ID: ${data.lead_id})`;
+                }
+            } else {
+                const errData = await prospectResp.json();
+                if (prospectStatus) {
+                    prospectStatus.className = 'status-message error';
+                    prospectStatus.innerText = errData.detail || 'Erro ao registrar lead.';
+                }
+            }
+        } catch (prospectErr) {
+            if (prospectStatus) {
+                prospectStatus.className = 'status-message error';
+                prospectStatus.innerText = 'Erro ao conectar com /prospect: ' + prospectErr.message;
+            }
+        }
 
         setTimeout(() => {
             statusMsg.innerText = '';

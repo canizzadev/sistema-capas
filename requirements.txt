@@ -10,3 +10,6 @@ pillow==11.3.0
 reportlab==4.4.10
 python-multipart==0.0.20
 google-genai==1.47.0
+google-api-python-client==2.152.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.1
