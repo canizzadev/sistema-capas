@@ -1,5 +1,6 @@
 import time
 import io
+import uuid
 import logging
 import asyncio
 from datetime import datetime, timezone
@@ -20,6 +21,10 @@ from execution.generate_cover import generate_cover_zip
 from execution.manage_leads import (
     create_lead, get_lead, get_lead_by_number, get_all_leads,
     update_status, update_lead, append_conversation,
+)
+from execution.manage_discovery import (
+    get_discovered_doctors, get_discovered_doctor, get_discovery_stats,
+    delete_discovered_doctor,
 )
 
 load_dotenv()
@@ -56,7 +61,18 @@ class ProspectRequest(BaseModel):
 class ManualMessageRequest(BaseModel):
     message: str
 
+class DiscoverRequest(BaseModel):
+    target_count: int = 50
+
+class PipelineRequest(BaseModel):
+    target_count: int = 30
+
+class SetNumberRequest(BaseModel):
+    whatsapp_number: str
+
 progress_store = {}
+pipeline_progress_store = {}
+pipeline_results_store = {}
 
 @app.get("/progress")
 def progress_api(task_id: str):
@@ -350,6 +366,207 @@ async def send_manual_message(lead_id: int, request: ManualMessageRequest):
             raise HTTPException(status_code=500, detail="Failed to send message via Z-API.")
     except Exception as e:
         logger.error("Error sending manual message for lead %d: %s", lead_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Discovery endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/discover")
+async def discover_doctors(request: DiscoverRequest):
+    """
+    Start the doctor discovery pipeline.
+    Runs synchronously for MVP — returns results when complete.
+    """
+    logger.info("Discovery request: target_count=%d", request.target_count)
+    try:
+        from execution.discovery_pipeline import run_discovery
+        result = await asyncio.to_thread(run_discovery, request.target_count)
+        return result
+    except Exception as e:
+        logger.error("Discovery pipeline error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/discovered")
+async def list_discovered():
+    """Return all discovered doctors."""
+    doctors = get_discovered_doctors()
+    return {"doctors": doctors}
+
+
+@app.get("/discovery-stats")
+async def discovery_stats():
+    """Return discovery pipeline statistics."""
+    stats = get_discovery_stats()
+    return stats
+
+
+@app.post("/discovered/{doctor_id}/promote")
+async def promote_doctor(doctor_id: int):
+    """
+    Promote a discovered doctor to the main leads pipeline.
+    Creates a lead with status 'cover_generated' so the existing flow continues.
+    Requires a whatsapp_number to be provided (or extracted from external_link).
+    """
+    doctor = get_discovered_doctor(doctor_id)
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Discovered doctor not found")
+
+    username = doctor["username"]
+    instagram_url = f"https://www.instagram.com/{username}/"
+
+    # For MVP: create the lead — WhatsApp number will need to be filled manually
+    # or extracted from the doctor's external_link if available
+    try:
+        lead = create_lead(
+            instagram_url=instagram_url,
+            username=username,
+            whatsapp_number=f"pending_{username}",  # placeholder until manual input
+            formatted_name=doctor.get("name", ""),
+            specialty_line=doctor.get("especialidade_detectada", ""),
+            headline="",
+            cover_path="",
+        )
+        # Remove from discovered_doctors after promotion
+        delete_discovered_doctor(doctor_id)
+
+        logger.info("Doctor @%s promoted to lead id=%d", username, lead["id"])
+        return {"status": "promoted", "lead_id": lead["id"], "username": username}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.error("Error promoting doctor %d: %s", doctor_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Full Pipeline endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/pipeline/start")
+async def start_pipeline(request: PipelineRequest):
+    """
+    Start the full end-to-end pipeline in background.
+    Returns a task_id to track progress and retrieve results.
+    """
+    task_id = str(uuid.uuid4())
+    logger.info("Pipeline start request: target_count=%d, task_id=%s", request.target_count, task_id)
+
+    pipeline_progress_store[task_id] = {
+        "status": "running",
+        "phase": "starting",
+        "current": 0,
+        "total": request.target_count,
+        "username": "",
+        "message": "Iniciando pipeline...",
+        "stats": {},
+    }
+    pipeline_results_store[task_id] = None
+
+    def on_progress(data):
+        pipeline_progress_store[task_id] = {
+            "status": "running",
+            "phase": data.get("phase", ""),
+            "current": data.get("current", 0),
+            "total": data.get("total", 0),
+            "username": data.get("username", ""),
+            "message": data.get("message", ""),
+            "stats": data.get("stats", {}),
+        }
+
+    def run_pipeline():
+        from execution.full_pipeline import run_full_pipeline
+        try:
+            result = run_full_pipeline(request.target_count, on_progress=on_progress)
+            pipeline_results_store[task_id] = result
+            pipeline_progress_store[task_id]["status"] = "completed"
+            pipeline_progress_store[task_id]["message"] = "Pipeline concluído!"
+        except Exception as e:
+            logger.error("Pipeline task %s failed: %s", task_id, e)
+            pipeline_progress_store[task_id]["status"] = "error"
+            pipeline_progress_store[task_id]["message"] = str(e)
+            pipeline_results_store[task_id] = {"error": str(e)}
+
+    asyncio.get_event_loop().run_in_executor(None, run_pipeline)
+
+    return {"task_id": task_id, "status": "started"}
+
+
+@app.get("/pipeline/progress/{task_id}")
+async def pipeline_progress(task_id: str):
+    """Return real-time progress for a pipeline task."""
+    progress = pipeline_progress_store.get(task_id)
+    if progress is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return progress
+
+
+@app.get("/pipeline/results/{task_id}")
+async def pipeline_results(task_id: str):
+    """Return final results for a completed pipeline task."""
+    if task_id not in pipeline_progress_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    progress = pipeline_progress_store[task_id]
+    if progress["status"] == "running":
+        return {"status": "running", "message": "Pipeline ainda em execução"}
+
+    results = pipeline_results_store.get(task_id)
+    if results is None:
+        return {"status": "error", "message": "Resultados não disponíveis"}
+
+    return {"status": progress["status"], "results": results}
+
+
+# ---------------------------------------------------------------------------
+# Leads: awaiting number management
+# ---------------------------------------------------------------------------
+
+@app.get("/leads/awaiting-number")
+async def leads_awaiting_number():
+    """List all leads with status 'awaiting_number'."""
+    all_leads = get_all_leads()
+    awaiting = [l for l in all_leads if l.get("status") == "awaiting_number"]
+    return {"leads": awaiting}
+
+
+@app.post("/leads/{lead_id}/set-number")
+async def set_lead_number(lead_id: int, request: SetNumberRequest):
+    """
+    Set the WhatsApp number for a lead in 'awaiting_number' status.
+    Updates the number and transitions status to 'cover_generated'.
+    """
+    lead = get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    if lead["status"] != "awaiting_number":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Lead status is '{lead['status']}', expected 'awaiting_number'"
+        )
+
+    number = request.whatsapp_number.strip()
+    if not number or len(number) < 10:
+        raise HTTPException(status_code=400, detail="Número inválido")
+
+    # Check if number already exists
+    existing = get_lead_by_number(number)
+    if existing and existing["id"] != lead_id:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Número já existe no lead ID {existing['id']}"
+        )
+
+    try:
+        update_lead(lead_id, whatsapp_number=number)
+        update_status(lead_id, "cover_generated")
+        logger.info("Lead %d: number set to %s, status → cover_generated", lead_id, number)
+        return {"status": "updated", "lead_id": lead_id, "new_status": "cover_generated"}
+    except Exception as e:
+        logger.error("Error setting number for lead %d: %s", lead_id, e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

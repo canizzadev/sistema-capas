@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -80,11 +81,14 @@ def scrape_profile(url: str):
                     result = {"error": f"Profile is private: {username}", "error_type": "private_profile", "username": username}
                     _cache_set(username, result)
                     return result
+                followers_data = user.get("edge_followed_by") or {}
                 result = {
                     "username": username,
                     "name": user.get("full_name") or username,
                     "bio": user.get("biography") or "",
-                    "external_link": user.get("external_url") or ""
+                    "external_link": user.get("external_url") or "",
+                    "followers": followers_data.get("count") if isinstance(followers_data, dict) else None,
+                    "profile_pic_url": user.get("profile_pic_url_hd") or user.get("profile_pic_url") or ""
                 }
                 logger.info("Tier 1 succeeded for '%s'", username)
                 _cache_set(username, result)
@@ -124,11 +128,14 @@ def scrape_profile(url: str):
                     result = {"error": f"Profile is private: {username}", "error_type": "private_profile", "username": username}
                     _cache_set(username, result)
                     return result
+                followers_data = user.get("edge_followed_by") or {}
                 result = {
                     "username": username,
                     "name": user.get("full_name") or username,
                     "bio": user.get("biography") or "",
-                    "external_link": user.get("external_url") or ""
+                    "external_link": user.get("external_url") or "",
+                    "followers": followers_data.get("count") if isinstance(followers_data, dict) else None,
+                    "profile_pic_url": user.get("profile_pic_url_hd") or user.get("profile_pic_url") or ""
                 }
                 logger.info("Tier 2 succeeded for '%s'", username)
                 _cache_set(username, result)
@@ -185,12 +192,36 @@ def scrape_profile(url: str):
                     bio_raw = bio_raw.replace(":", "", 1).strip()
                 bio = bio_raw
 
+        # Try to extract followers count from HTML/description
+        followers = None
+        followers_match = re.search(r'([\d,.]+[MKmk]?)\s*Followers', desc_content)
+        if followers_match:
+            raw = followers_match.group(1).replace(",", "").replace(".", "")
+            suffix = raw[-1].upper() if raw[-1] in "MmKk" else ""
+            num_str = raw[:-1] if suffix else raw
+            try:
+                num = float(num_str)
+                if suffix == "K":
+                    followers = int(num * 1_000)
+                elif suffix == "M":
+                    followers = int(num * 1_000_000)
+                else:
+                    followers = int(num)
+            except ValueError:
+                pass
+
+        # og:image typically contains the profile picture
+        og_image_tag = soup.find("meta", property="og:image")
+        profile_pic_url = og_image_tag["content"] if og_image_tag else ""
+
         # In the fallback, external_link isn't reliably available in meta tags
         result = {
             "username": username,
             "name": name,
             "bio": bio,
-            "external_link": ""
+            "external_link": "",
+            "followers": followers,
+            "profile_pic_url": profile_pic_url
         }
         logger.info("Tier 3 (HTML fallback) succeeded for '%s'", username)
         _cache_set(username, result)

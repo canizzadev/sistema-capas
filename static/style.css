@@ -139,3 +139,37 @@ button:disabled { background-color: #a0aec0; cursor: not-allowed; opacity: 0.7; 
 
 .hidden { display: none !important; }
 .progress-text { font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); margin-left: auto; }
+
+/* Discovery tab */
+.discovery-controls { display: flex; gap: 16px; align-items: flex-end; margin-bottom: 20px; }
+.discovery-stats-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.stat-badge { padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+.stat-badge.approved { background: #d1fae5; color: #065f46; }
+.stat-badge.rejected { background: #fee2e2; color: #991b1b; }
+.stat-badge.skipped { background: #e0e7ff; color: #3730a3; }
+.stat-badge.errors { background: #fef3c7; color: #92400e; }
+
+.discovery-log { max-height: 240px; overflow-y: auto; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 0.82rem; line-height: 1.7; }
+.log-entry { padding: 2px 0; border-bottom: 1px solid #f1f5f9; }
+.log-entry:last-child { border-bottom: none; }
+.log-approved { color: #065f46; }
+.log-rejected { color: #991b1b; }
+.log-error { color: #e53e3e; }
+.log-skipped { color: #6366f1; }
+
+.discovery-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.discovery-table th { text-align: left; padding: 10px 12px; background: #f1f5f9; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid var(--border-color); white-space: nowrap; }
+.discovery-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.discovery-table tr:hover td { background: #f8fafc; }
+.discovery-table a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.discovery-table a:hover { text-decoration: underline; }
+
+.btn-promote { background: var(--accent); color: #fff; border: none; padding: 6px 16px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.btn-promote:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-promote:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-promote.promoted { background: #d1fae5; color: #065f46; }
+
+.btn-refresh { background: white; border: 1px solid #CBD5E1; border-radius: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 500; cursor: pointer; color: var(--text-primary); }
+.btn-refresh:hover { background: #f8fafc; }
+
+.empty-state { text-align: center; color: var(--text-secondary); padding: 32px 16px; font-size: 0.9rem; }

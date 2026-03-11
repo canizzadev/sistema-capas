@@ -41,6 +41,7 @@ DB_PATH = os.getenv("DB_PATH", "./sistema_capas.db")
 
 # Valid transitions: current_status -> set of allowed next statuses
 VALID_TRANSITIONS = {
+    "awaiting_number":    {"cover_generated"},
     "cover_generated":    {"warm_up_sent"},
     "warm_up_sent":       {"warm_up_responded"},
     "warm_up_responded":  {"message_sent"},
@@ -127,13 +128,16 @@ def create_lead(
     specialty_line: str = "",
     headline: str = "",
     cover_path: str = "",
+    status: str = "cover_generated",
     db_path: Optional[str] = None,
 ) -> dict:
     """
-    Insert a new lead with status = cover_generated.
+    Insert a new lead with the given status (default: cover_generated).
     Returns the full row as a dict.
     Raises ValueError if the whatsapp_number already exists.
     """
+    if status not in ALL_STATUSES:
+        raise ValueError(f"Invalid initial status: '{status}'")
     now = _now_iso()
     conn = _get_connection(db_path)
     try:
@@ -144,12 +148,12 @@ def create_lead(
                 formatted_name, specialty_line, headline,
                 cover_path, status, conversation_history,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'cover_generated', '[]', ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?)
             """,
             (
                 instagram_url, username, whatsapp_number,
                 formatted_name, specialty_line, headline,
-                cover_path, now, now,
+                cover_path, status, now, now,
             ),
         )
         conn.commit()
@@ -248,7 +252,7 @@ def update_status(lead_id: int, new_status: str, db_path: Optional[str] = None) 
 UPDATABLE_FIELDS = {
     "formatted_name", "specialty_line", "headline", "cover_path",
     "contact_classification", "warm_up_message", "warm_up_sent_at",
-    "last_lead_reply_at", "send_error_at",
+    "last_lead_reply_at", "send_error_at", "whatsapp_number",
 }
 
 
